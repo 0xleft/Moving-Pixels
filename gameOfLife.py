@@ -10,6 +10,7 @@ pygame.init()
 clock = pygame.time.Clock()
 gameDisplay = pygame.display.set_mode((PYGAME_WIDTH,PYGAME_HEIGHT))
 
+
 FPS = 60
 menu = pygame.image.load('menu.jpg')
 
@@ -37,10 +38,10 @@ def drawGrid():
         for j in i: #we have singular block 0 = white 1= black
             if j == 1:
                 rect = pygame.Rect(x,y,BLOCKSIZE,BLOCKSIZE)
-                pygame.draw.rect(gameDisplay, [0,0,0], rect, 10)
+                pygame.draw.rect(gameDisplay, [0,0,0], rect, 100)
             if j == 0:
                 rect = pygame.Rect(x,y,BLOCKSIZE,BLOCKSIZE)
-                pygame.draw.rect(gameDisplay, [255,255,0], rect, 10)
+                pygame.draw.rect(gameDisplay, [255,255,255], rect, 100)
             x+=BLOCKSIZE
         y+=BLOCKSIZE
         
@@ -104,8 +105,8 @@ def countNeighbours(cell):
 
 
 def simulate():
-    y = 0
     tempgrid = numpy.random.randint(0,1,GRID_SHAPE).tolist()
+    y = 0
     for row in grid:
         x=0
         for cell in row:
@@ -120,24 +121,27 @@ def simulate():
                 tempgrid[y][x] = 1
             x+=1
         y+=1
+
     return tempgrid
 
 changing = False
 threading.Thread(target=count_seconds, name='counting_seconds_thread').start()
 while True:
-    mousepos = pygame.mouse.get_pos()
-    gameDisplay.fill(BACKGROUND_COLOR)
-
-
+    mousepos = pygame.mouse.get_pos() # get mouse position
+    gameDisplay.fill(BACKGROUND_COLOR) # refresh
+        
     dtime = time.perf_counter() - dtimeStart
     
     clock.tick(FPS)
 
+
     for event in pygame.event.get():
         if event.type == pygame.MOUSEBUTTONDOWN:
             changing = True
+            FPS = 20
         if event.type == pygame.MOUSEBUTTONUP:
             changing = False
+            FPS = 60
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_q:
                 stopping = True
@@ -153,9 +157,10 @@ while True:
                 if started_playing == True:
                     started_playing = False
                     FPS = 60
+                    grid = numpy.random.randint(0,1,GRID_SHAPE).tolist()
                 else:
                     started_playing = True
-                    FPS = 4
+                    FPS = 20
             if event.key == pygame.K_HOME:
                 grid =numpy.random.randint(0,2,GRID_SHAPE).tolist()
             if event.key == pygame.K_d:
@@ -164,7 +169,10 @@ while True:
             if event.key == pygame.K_a:
                 FPS -= 3
                 print(f'FPS: {FPS}')
-    
+            if event.key == pygame.K_s:
+                started_playing = False
+                FPS = 60
+                grid = numpy.random.randint(0,1,GRID_SHAPE).tolist()
 
     #------------------#
     if changing == True:
@@ -177,6 +185,8 @@ while True:
     if started_playing == True:
         grid = simulate()
     drawGrid()
+
+    
     #if not started_playing:
     #    gameDisplay.blit(menu, (0,0))
 
