@@ -1,5 +1,3 @@
-from copy import copy
-from ssl import CHANNEL_BINDING_TYPES
 import pygame
 import time
 from settings import *
