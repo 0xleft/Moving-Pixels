@@ -1,22 +1,27 @@
+from copy import copy
+from ssl import CHANNEL_BINDING_TYPES
 import pygame
 import time
 from settings import *
 import threading
 import math
 import numpy
+import random
+
 
 dtimeStart = time.perf_counter()
 pygame.init()
 clock = pygame.time.Clock()
 gameDisplay = pygame.display.set_mode((PYGAME_WIDTH,PYGAME_HEIGHT))
 
-
+changes = []
+all_changes = []
 FPS = 60
-menu = pygame.image.load('menu.jpg')
 
 blinked = False
 stopping = False
 started_playing = False
+
 
 def count_seconds():
     last = time.perf_counter()
@@ -31,20 +36,38 @@ def count_seconds():
 grid = numpy.random.randint(0,1,GRID_SHAPE).tolist()
 print(len(grid), len(grid[0]), '<--------shape of the grid')
 
-def drawGrid():
-    y = 0
-    for i in grid:
-        x=0
-        for j in i: #we have singular block 0 = white 1= black
-            if j == 1:
-                rect = pygame.Rect(x,y,BLOCKSIZE,BLOCKSIZE)
-                pygame.draw.rect(gameDisplay, [0,0,0], rect, 100)
-            if j == 0:
-                rect = pygame.Rect(x,y,BLOCKSIZE,BLOCKSIZE)
-                pygame.draw.rect(gameDisplay, [255,255,255], rect, 100)
-            x+=BLOCKSIZE
-        y+=BLOCKSIZE
-        
+def detectEmptyEdnges(boys):
+    if 1 in boys[0]:
+        return False # edges arent empty
+    if 1 in boys[-1]:
+        return False # edges arent empty
+    for i in range(len(boys)):
+        if boys[i][0] == 1:
+            return False
+        if boys[i][-1] == 1:
+            return False
+    return True
+
+boys = [[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]]*10
+
+print(detectEmptyEdnges(boys))
+
+
+def updateGrid():
+    global changes, all_changes
+    print(len(changes),changes)
+    for i in changes:
+        y,x,cell = i
+        if cell == 1:
+            rect = pygame.Rect(x*BLOCKSIZE,y*BLOCKSIZE,BLOCKSIZE,BLOCKSIZE)
+            pygame.draw.rect(gameDisplay, [0,0,0], rect, 100)
+        if cell == 0:
+            rect = pygame.Rect(x*BLOCKSIZE,y*BLOCKSIZE,BLOCKSIZE,BLOCKSIZE)
+            pygame.draw.rect(gameDisplay, [255,255,255], rect, 100)
+        grid[y][x] = cell
+    all_changes.append(changes)
+    changes=[]
+
 
 def getFirstDigit(num):
     digits = int(math.log10(num))
@@ -54,7 +77,6 @@ def getFirstDigit(num):
 
 def findGrid(mousepos):
     mousepos = [int(mousepos[0]/BLOCKSIZE), int(mousepos[1]/BLOCKSIZE)]
-    print(mousepos, 'changes this grid point')
     return mousepos
 
 
@@ -105,31 +127,30 @@ def countNeighbours(cell):
 
 
 def simulate():
-    tempgrid = numpy.random.randint(0,1,GRID_SHAPE).tolist()
     y = 0
     for row in grid:
         x=0
         for cell in row:
             neighbours = countNeighbours([x,y])
             if cell == 1 and neighbours < 2:
-                tempgrid[y][x] = 0 # underpopulation
+                changes.append([y,x,0]) # underpopulation
             if cell == 1 and neighbours in range(2,4):
-                tempgrid[y][x] = 1 # lives
+                changes.append([y,x,1])
             if cell == 1 and neighbours > 3:
-                tempgrid[y][x] = 0 # overpopulation
+                changes.append([y,x,0])
             if cell == 0 and neighbours == 3:
-                tempgrid[y][x] = 1
+                changes.append([y,x,1])
             x+=1
         y+=1
 
-    return tempgrid
 
+gameDisplay.fill(BACKGROUND_COLOR)
 changing = False
 threading.Thread(target=count_seconds, name='counting_seconds_thread').start()
 while True:
+
     mousepos = pygame.mouse.get_pos() # get mouse position
-    gameDisplay.fill(BACKGROUND_COLOR) # refresh
-        
+     # refresh
     dtime = time.perf_counter() - dtimeStart
     
     clock.tick(FPS)
@@ -137,11 +158,12 @@ while True:
 
     for event in pygame.event.get():
         if event.type == pygame.MOUSEBUTTONDOWN:
-            changing = True
-            FPS = 20
-        if event.type == pygame.MOUSEBUTTONUP:
-            changing = False
-            FPS = 60
+            changes_m = findGrid(mousepos)
+            if grid[changes_m[1]][changes_m[0]] == 1:
+                changes.append([changes_m[1],changes_m[0], 0])
+            else:
+                changes.append([changes_m[1],changes_m[0], 1])
+            print(changes_m,changes)
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_q:
                 stopping = True
@@ -153,40 +175,31 @@ while True:
                     except RuntimeError:
                         print(f'cannot join {i}')
                 break
+            #if event.key == pygame.K_HOME:
+            #    grid =numpy.random.randint(0,2,GRID_SHAPE).tolist()
             if event.key == pygame.K_SPACE:
                 if started_playing == True:
-                    started_playing = False
-                    FPS = 60
-                    grid = numpy.random.randint(0,1,GRID_SHAPE).tolist()
+                    started_playing=False
                 else:
-                    started_playing = True
-                    FPS = 20
-            if event.key == pygame.K_HOME:
-                grid =numpy.random.randint(0,2,GRID_SHAPE).tolist()
-            if event.key == pygame.K_d:
-                FPS += 3
-                print(f'FPS: {FPS}')
-            if event.key == pygame.K_a:
-                FPS -= 3
-                print(f'FPS: {FPS}')
-            if event.key == pygame.K_s:
-                started_playing = False
-                FPS = 60
-                grid = numpy.random.randint(0,1,GRID_SHAPE).tolist()
+                    started_playing=True
 
-    #------------------#
-    if changing == True:
-        changes = findGrid(mousepos)
-        if grid[changes[1]][changes[0]] == 1:
-            grid[changes[1]][changes[0]] = 0
-        else:
-            grid[changes[1]][changes[0]] = 1
-
-    if started_playing == True:
-        grid = simulate()
-    drawGrid()
 
     
+    if started_playing == True:
+        simulate()
+
+    if len(changes) != 0:
+        updateGrid()
+    
+    try:
+        if numpy.array_equal(all_changes[-1], all_changes[-3]):
+            started_playing = False
+            print(len(all_changes))
+            print('repetition')
+    except:
+        print('not enought updates')
+
+
     #if not started_playing:
     #    gameDisplay.blit(menu, (0,0))
 
